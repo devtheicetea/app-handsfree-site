@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Whisper kept thanking me for messages I never sent — Handsfree Blog</title>
+  <meta name="description" content="Three Whisper hallucination bugs in increasing order of weirdness — phantom 'Thank you.' messages, ghosts in the echo-cancelled silence, and a fictional Chinese subtitle volunteer — and what actually fixed them." />
+
+  <link rel="canonical" href="https://handsfree.contraststudio.app/blog/whisper-thank-you.html" />
+
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://handsfree.contraststudio.app/blog/whisper-thank-you.html" />
+  <meta property="og:title" content="Whisper kept thanking me for messages I never sent" />
+  <meta property="og:description" content="Three Whisper hallucination bugs in increasing order of weirdness, and what actually fixed them." />
+  <meta property="og:image" content="https://handsfree.contraststudio.app/assets/logo.png" />
+  <meta name="twitter:card" content="summary" />
+
+  <link rel="icon" type="image/png" href="../assets/logo.png" />
+  <link rel="apple-touch-icon" href="../assets/logo.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="../styles.css" />
+  <link rel="stylesheet" href="blog.css" />
+</head>
+<body>
+
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="nav-brand" href="../index.html" aria-label="Handsfree home">
+        <img src="../assets/logo.png" alt="" />
+        <img src="../assets/wordmark.png" alt="Handsfree" style="height:20px" />
+      </a>
+      <nav class="nav-links">
+        <a class="link" href="index.html">Blog</a>
+        <a class="link" href="https://github.com/devtheicetea/handsfree" target="_blank" rel="noopener">GitHub</a>
+        <a class="btn btn-primary" href="https://apps.apple.com/app/apple-store/id6781863812?pt=128939791&ct=blog&mt=8">Download</a>
+      </nav>
+    </div>
+  </header>
+
+  <article class="post">
+    <p class="post-kicker">Engineering</p>
+    <h1>Whisper kept thanking me for messages I never sent</h1>
+    <p class="post-meta">
+      <span>July 8, 2026</span><span class="dot">·</span><span>7 min read</span><span class="dot">·</span><span>by the maker of Handsfree</span>
+    </p>
+
+    <p>I'm building <a href="../index.html">Handsfree</a>, an iOS app that lets you talk to Claude Code by voice — your phone connects to a small bridge on your own machine, you speak, the agent codes, and it reads the replies back. A few weeks ago I started adding a better transcription path, and Whisper spent the next several days politely thanking me for things I never said.</p>
+
+    <p>This is the story of three hallucination bugs, in increasing order of weirdness, and what actually fixed them.</p>
+
+    <h2>The setup: hybrid transcription</h2>
+
+    <p>Apple's on-device speech recognition is fast and free, but the transcripts are raw: no punctuation, filler words everywhere, and mixed-language speech comes out mangled. Whisper produces beautiful transcripts — punctuated, multilingual — but it's a batch model, not a streaming one.</p>
+
+    <p>So I did both:</p>
+
+    <ul>
+      <li><b>On-device</b> (<code>SFSpeechRecognizer</code>) provides the live transcript while you talk, plus endpoint detection — it decides when you've stopped speaking.</li>
+      <li>On endpoint, the phone ships the <b>raw utterance audio</b> (16-bit PCM over WebSocket) to the bridge, where <b>whisper.cpp</b> (large-v3-turbo, Metal, via <a href="https://github.com/JacobLinCool/smart-whisper" target="_blank" rel="noopener">smart-whisper</a>) transcribes the whole thing with full context.</li>
+      <li>The polished Whisper transcript is what actually gets sent to the agent. If the bridge is slow or down, the on-device text is the fallback.</li>
+    </ul>
+
+    <p>(The shipped app defaults to Apple's fully on-device voice; this hybrid path is an optional bridge-side upgrade I'm rolling out — the "bridge" is your own machine, so audio still never leaves your own hardware.)</p>
+
+    <p>First tests were great. Punctuation, capitalization, <code>settings</code> and <code>fix</code> preserved as English inside Chinese sentences. Then I stopped talking for a moment.</p>
+
+    <h2>Bug 1: the phantom "Thank you."</h2>
+
+    <p>During testing, I dismissed a half-spoken message and paused. The app sent <b>"Thank you."</b> to my coding agent. I didn't say anything. I tried to cancel another message — it sent <em>another</em> "Thank you."</p>
+
+    <p>The bridge log made the pattern obvious:</p>
+
+    <pre><code>18:29:31 [stt.transcript] chars=10 ms=1203 text=Thank you.
+18:29:48 [stt.transcript] chars=10 ms=1184 text=Thank you.</code></pre>
+
+    <p>Both "utterances" were near-silent audio buffers — leftover capture from after a dismissed message. Whisper looked at silence and confidently produced gratitude.</p>
+
+    <p>This turns out to be one of Whisper's most famous failure modes. It was trained on a vast amount of YouTube-style audio with subtitles, and the tail end of that training data is saturated with outro lines. Feed it silence or near-silence and the decoder's most probable continuation is subtitle boilerplate: <em>"Thank you."</em>, <em>"Thanks for watching!"</em>, <em>"Please subscribe."</em> There are long GitHub threads about it (<a href="https://github.com/openai/whisper/discussions/679" target="_blank" rel="noopener">openai/whisper #679</a>, <a href="https://github.com/ggml-org/whisper.cpp/issues/1724" target="_blank" rel="noopener">whisper.cpp #1724</a>) and even <a href="https://arxiv.org/abs/2501.11378" target="_blank" rel="noopener">a paper investigating hallucinations induced by non-speech audio</a>.</p>
+
+    <p><b>Fix 1: don't ask Whisper about silence.</b> I already had a second opinion available — the on-device recognizer. If <code>SFSpeechRecognizer</code> heard zero words in the buffer, it's silence; discard it and never call Whisper at all. The on-device transcript became a speech-presence gate:</p>
+
+    <pre><code>// The on-device transcript is our speech-presence gate. If SFSpeech heard
+// nothing, it's silence — do NOT hand the buffer to Whisper, which
+// HALLUCINATES ("Thank you", "Thanks for watching", …) on silence.
+guard !onDeviceText.isEmpty else {
+    discardCapturedAudio()
+    return
+}</code></pre>
+
+    <p>Phantom messages: gone. For about an hour.</p>
+
+    <h2>Bug 2: "Thank you. Thank you." — now at the <em>start</em></h2>
+
+    <p>The next hallucination arrived at the <em>beginning</em> of a real message:</p>
+
+    <blockquote><p><b>Thank you. Thank you.</b> I think this is working. Next, I'm going to test some other languages…</p></blockquote>
+
+    <p>I definitely didn't open with double gratitude. The log had the tell:</p>
+
+    <pre><code>19:06:43 [stt.trim] fromMs=123500 toMs=107010</code></pre>
+
+    <p>The audio buffer was <b>123 seconds long</b>. Why? Barge-in. The app lets you interrupt the agent mid-reply, and to catch your first word, it starts recording while the reply is still playing. That reply played for two minutes before I interrupted — and the whole time, the buffer was recording the <em>echo-cancelled residue</em> of the app's own text-to-speech.</p>
+
+    <p>Hardware echo cancellation is good, but its output isn't digital zero — it's a faint smear of almost-silence. So Whisper received: <b>~100 seconds of ghostly near-silence, then me talking.</b> It transcribed the ghost first. The ghost says thank you.</p>
+
+    <p><b>Fix 2 came in two parts:</b></p>
+
+    <ol>
+      <li><b>Client:</b> at the moment of barge-in, throw away everything recorded during the reply except a 2-second pre-roll (enough to keep the user's first words, which is what the recording was for).</li>
+      <li><b>Bridge:</b> trim leading/trailing near-silence before every transcription — RMS energy over 30&nbsp;ms windows, drop everything below a threshold, keep ~120&nbsp;ms of margin at the front so word onsets don't get clipped and ~60&nbsp;ms at the tail:</li>
+    </ol>
+
+    <pre><code>const win = 480;        // 30 ms @ 16 kHz
+const thresh = 0.012;   // RMS gate: speech sits well above, room noise below
+// … find first/last voiced window, keep small pads, subarray the rest away</code></pre>
+
+    <p>Now Whisper only ever saw actual speech with tight margins. Surely that's the end of it.</p>
+
+    <h2>Bug 3: the Chinese subtitle volunteer</h2>
+
+    <p>I switched testing to Mandarin. At the end of an ordinary message, Whisper appended:</p>
+
+    <blockquote><p>中文字幕志愿者 杨栋梁</p></blockquote>
+
+    <p>That translates to roughly <em>"Chinese subtitle volunteer: Yang Dongliang."</em> Whisper didn't just hallucinate a phrase — it <b>credited a fictional member of the fansub team</b> that transcribed my nonexistent video.</p>
+
+    <p>It's the same YouTube-training-data failure mode wearing a different hat: in Chinese content, the boilerplate at the end of subtitled videos isn't "thanks for watching," it's the subtitle group's credit line. Different language, same statistical ghost.</p>
+
+    <p>But wait — I was trimming silence now. The log agreed:</p>
+
+    <pre><code>19:57:28 [stt.trim] fromMs=23500 toMs=19680   ← trimmed 3.8s
+19:57:31 [stt.transcript] …都给删了吧。中文字幕志愿者 杨栋梁</code></pre>
+
+    <p>The trim ran, and the hallucination survived. The problem: <b>an energy gate is not a voice activity detector.</b> The tail of that recording wasn't digital silence — it was breath and faint mouth noise, <em>just</em> above the RMS threshold. Loud enough to survive the trim; speech-free enough to trigger the hallucination. You can't fix that by tuning the threshold, because the next recording's breath will sit somewhere else.</p>
+
+    <p><b>Fix 3: make the model police itself.</b> whisper.cpp exposes decoder-level knobs for exactly this, and they're the standard anti-hallucination stack:</p>
+
+    <pre><code>const opts = {
+  language,
+  suppress_non_speech_tokens: true,  // ban non-speech tokens outright
+  no_speech_thold: 0.6,              // trust the model's own "no speech here" signal
+  entropy_thold: 2.4,                // reject high-entropy (rambling) segments
+  logprob_thold: -1.0,               // reject low-confidence segments
+};</code></pre>
+
+    <p>Whisper computes a <code>no_speech</code> probability and per-token confidences internally — by default it just doesn't act on them very aggressively. These thresholds tell it: if you suspect a segment isn't speech, or you're not confident in what you decoded, drop it instead of improvising.</p>
+
+    <h2>Bonus round: the punctuation primer</h2>
+
+    <p>One more Whisper quirk from the same week, too good not to include. English transcripts came back beautifully punctuated. Chinese transcripts came back as one endless run-on sentence — unless I paused dramatically between phrases like a news anchor.</p>
+
+    <p>The fix is delightfully dumb: <b>give Whisper a punctuated example.</b> The <code>initial_prompt</code> parameter primes the decoder's context, and the decoder imitates the style of what it sees:</p>
+
+    <pre><code>function punctuationPrimer(language: string): string {
+  switch (language) {
+    case "zh": return "以下是普通话的句子，包含逗号、句号和问号等标点符号。";
+    case "ja": return "以下は、句読点を含む日本語の文章です。";
+    default:   return ""; // English punctuates fine on its own
+  }
+}</code></pre>
+
+    <p>One punctuated Mandarin sentence as a primer, and every Chinese transcript came back with proper 逗号 and 句号. (It also nudges the output toward Simplified characters, which I wanted anyway.)</p>
+
+    <h2>What I'd tell you if you're shipping Whisper in a product</h2>
+
+    <ol>
+      <li><b>Never feed Whisper silence.</b> It doesn't return empty — it returns YouTube outros. Gate with real speech detection <em>before</em> the model. If you have any secondary signal that speech occurred (another recognizer, a VAD), use it as a hard gate.</li>
+      <li><b>Energy trimming is necessary but not sufficient.</b> It removes the obvious padding, but breath and room tone sail right through an RMS gate, and they hallucinate just as well as silence does.</li>
+      <li><b>Turn on the decoder's own defenses.</b> <code>suppress_non_speech_tokens</code> and the <code>no_speech</code>/<code>entropy</code>/<code>logprob</code> thresholds exist because the model already <em>knows</em> when it's improvising. Make it act on that.</li>
+      <li><b>Prime for punctuation in CJK languages.</b> A one-sentence punctuated <code>initial_prompt</code> fixes run-on Chinese transcripts almost completely.</li>
+      <li><b>Log everything about the audio, not just the text.</b> Every one of these bugs was solved by one log line — buffer duration, trim amounts, transcription time. <code>fromMs=123500</code> told the whole barge-in story instantly.</li>
+    </ol>
+
+    <p>The hallucinations were never random. Each one was Whisper doing exactly what it was trained to do — completing the most statistically likely subtitle for the audio it was given. The bug was always in what I was giving it.</p>
+
+    <hr />
+
+    <p class="post-foot"><b>Handsfree</b> is a free iOS app for talking to Claude Code and Codex hands-free — the agent runs on your own machine, and your phone talks to it over your own network. It's <a href="https://apps.apple.com/app/apple-store/id6781863812?pt=128939791&ct=blog&mt=8">on the App Store</a>, and the bridge is <a href="https://www.npmjs.com/package/handsfree-bridge" target="_blank" rel="noopener"><code>npx handsfree-bridge</code></a> (<a href="https://github.com/devtheicetea/handsfree" target="_blank" rel="noopener">MIT, open source</a>).</p>
+  </article>
+
+  <footer class="site">
+    <div class="wrap">
+      <div class="foot-bottom">
+        <span>&copy; <span id="year">2026</span> Contrast Studio LLC. All rights reserved.</span>
+        <span><a href="index.html" style="color:inherit">Blog</a> · <a href="../index.html" style="color:inherit">Home</a> · <a href="../privacy.html" style="color:inherit">Privacy</a></span>
+      </div>
+    </div>
+  </footer>
+
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>

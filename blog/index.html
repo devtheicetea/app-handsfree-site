@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blog — Handsfree</title>
+  <meta name="description" content="Engineering notes from building Handsfree — a free iOS app for talking to Claude Code and Codex hands-free." />
+
+  <link rel="canonical" href="https://handsfree.contraststudio.app/blog/" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://handsfree.contraststudio.app/blog/" />
+  <meta property="og:title" content="Handsfree Blog" />
+  <meta property="og:description" content="Engineering notes from building a hands-free voice client for coding agents." />
+  <meta property="og:image" content="https://handsfree.contraststudio.app/assets/logo.png" />
+
+  <link rel="icon" type="image/png" href="../assets/logo.png" />
+  <link rel="apple-touch-icon" href="../assets/logo.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="../styles.css" />
+  <link rel="stylesheet" href="blog.css" />
+</head>
+<body>
+
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="nav-brand" href="../index.html" aria-label="Handsfree home">
+        <img src="../assets/logo.png" alt="" />
+        <img src="../assets/wordmark.png" alt="Handsfree" style="height:20px" />
+      </a>
+      <nav class="nav-links">
+        <a class="link" href="index.html">Blog</a>
+        <a class="link" href="https://github.com/devtheicetea/handsfree" target="_blank" rel="noopener">GitHub</a>
+        <a class="btn btn-primary" href="https://apps.apple.com/app/apple-store/id6781863812?pt=128939791&ct=blog&mt=8">Download</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="post-list">
+    <h1>Engineering notes</h1>
+
+    <a class="post-card" href="whisper-thank-you.html">
+      <h2>Whisper kept thanking me for messages I never sent</h2>
+      <p>Three hallucination bugs in increasing order of weirdness — phantom "Thank&nbsp;you." messages, ghosts in the echo-cancelled silence, and a fictional Chinese subtitle volunteer — and what actually fixed them.</p>
+      <span class="when">July 8, 2026 · 7 min read</span>
+    </a>
+  </main>
+
+  <footer class="site">
+    <div class="wrap">
+      <div class="foot-bottom">
+        <span>&copy; <span id="year">2026</span> Contrast Studio LLC. All rights reserved.</span>
+        <span><a href="../index.html" style="color:inherit">Home</a> · <a href="../privacy.html" style="color:inherit">Privacy</a></span>
+      </div>
+    </div>
+  </footer>
+
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>

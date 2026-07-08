@@ -1,0 +1,131 @@
+/* ============================================================
+   Handsfree — blog article typography
+   Extends styles.css (same paper/ink/seal variables)
+   ============================================================ */
+
+.post {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 64px 24px 48px;
+}
+
+.post-kicker {
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--seal);
+  margin: 0 0 14px;
+}
+
+.post h1 {
+  font-family: var(--serif);
+  font-size: clamp(34px, 5.4vw, 48px);
+  line-height: 1.12;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  margin: 0 0 14px;
+}
+
+.post-meta {
+  color: var(--muted);
+  font-size: 14.5px;
+  margin: 0 0 42px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.post-meta .dot { opacity: .5; }
+
+.post h2 {
+  font-family: var(--serif);
+  font-size: clamp(24px, 3.4vw, 30px);
+  font-weight: 500;
+  line-height: 1.2;
+  margin: 46px 0 14px;
+}
+
+.post p, .post li { font-size: 17px; line-height: 1.75; color: var(--ink-soft); }
+.post b, .post strong { color: var(--ink); }
+.post a { color: var(--seal); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--seal) 40%, transparent); text-underline-offset: 3px; }
+.post a:hover { text-decoration-color: var(--seal); }
+
+.post ul, .post ol { padding-left: 26px; margin: 16px 0; }
+.post li { margin: 8px 0; }
+.post li::marker { color: var(--seal); }
+
+.post code {
+  font-family: var(--mono);
+  font-size: .86em;
+  background: var(--paper-2);
+  border: 1px solid var(--hairline-2);
+  border-radius: 6px;
+  padding: 2px 6px;
+  color: var(--ink);
+}
+
+.post pre {
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 18px 20px;
+  overflow-x: auto;
+  margin: 22px 0;
+}
+.post pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--ink);
+}
+
+.post blockquote {
+  margin: 22px 0;
+  padding: 6px 0 6px 22px;
+  border-left: 3px solid var(--seal);
+  font-family: var(--serif);
+  font-size: 19px;
+  font-style: italic;
+  color: var(--ink);
+}
+.post blockquote p { font-family: inherit; font-size: inherit; color: inherit; margin: 6px 0; }
+
+.post hr {
+  border: none;
+  border-top: 1px solid var(--hairline);
+  margin: 44px 0;
+}
+
+.post .post-foot {
+  font-size: 15px;
+  color: var(--muted);
+  font-style: italic;
+}
+.post .post-foot b { color: var(--ink); }
+
+/* --- blog index --- */
+.post-list { max-width: 720px; margin: 0 auto; padding: 64px 24px 80px; }
+.post-list > h1 {
+  font-family: var(--serif);
+  font-size: clamp(32px, 5vw, 44px);
+  font-weight: 500;
+  margin: 0 0 34px;
+}
+.post-card {
+  display: block;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 26px 28px;
+  margin-bottom: 18px;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.post-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(22,19,15,.12); }
+.post-card h2 { font-family: var(--serif); font-size: 24px; font-weight: 500; margin: 0 0 8px; color: var(--ink); }
+.post-card p { margin: 0 0 10px; color: var(--muted); font-size: 15.5px; line-height: 1.6; }
+.post-card .when { font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
